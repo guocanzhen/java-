@@ -1,0 +1,15 @@
+springboot的单元测试（总结两种）
+
+1、在类上使用注解：
+类：
+@RunWith(SpringRunner.class) 
+@SpringBootTest
+方法：
+@Test
+
+方法不能有入参
+出参必须为void
+
+2、继承CommandLineRunner接口：
+CommandLineRunner：表示在项目启动完成后 会执行该功能，只需将测试的内容写在其run（）方法中
+

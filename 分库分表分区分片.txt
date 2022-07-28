@@ -1,0 +1,184 @@
+分库分表分区分片
+
+1、分区：
+数据分区是一种物理数据库的设计技术，它的目的是为了在特定的SQL操作中减少数据读写的总量以缩减响应时间。
+分区并不是生成新的数据表，而是将表的数据均衡分摊到不同的硬盘，系统或是不同服务器存储介子中，实际上还是一张表。另外，分区可以做到将表的数据均衡到不同的地方，提高数据检索的效率，降低数据库的频繁IO压力值。
+
+分区落地实现：
+Range分区
+步骤
+1、先创建Product-Partiton-Range：
+CREATE TABLE `product-Partiton-Range` (
+    `Id` BIGINT(8) NOT NULL,
+    `ProductName` CHAR(245) NOT NULL DEFAULT '1',
+    `ProductId` CHAR(255) NOT NULL DEFAULT '1',
+    `ProductDescription` CHAR(255) NOT NULL DEFAULT '1',
+    `ProductUrl` CHAR(255) NOT NULL DEFAULT '1',
+    PRIMARY KEY (`Id`),
+    INDEX `ProductId` (`ProductId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+PARTITION BY RANGE (Id) PARTITIONS 3 (
+PARTITION part0 VALUES LESS THAN (12980), 
+PARTITION part1 VALUES LESS THAN (25960), 
+PARTITION part2 VALUES LESS THAN MAXVALUE);
+2、然后查询分区表
+select * from product-Partiton-Range where Id = 25000
+
+Hash分区
+1、先创建Product-Partiton-Hash
+CREATE TABLE `product-Partiton-Hash` (
+    `Id` BIGINT(8) NOT NULL,
+    `ProductName` CHAR(245) NOT NULL DEFAULT '1',
+    `ProductId` CHAR(255) NOT NULL DEFAULT '1',
+    `ProductDescription` CHAR(255) NOT NULL DEFAULT '1',
+    `ProductUrl` CHAR(255) NOT NULL DEFAULT '1',
+    PRIMARY KEY (`Id`),
+    INDEX `ProductId` (`ProductId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+PARTITION BY HASH (Id) PARTITIONS 3;
+Hash分区只能进行数字字段进行分区，无法进行字符字段进行分区。
+
+Key分区
+1、先创建Product-Partiton-Key
+CREATE TABLE `product-Partiton-Key` (
+    `Id` BIGINT(8) NOT NULL,
+    `ProductName` CHAR(245) NOT NULL DEFAULT '1',
+    `ProductId` CHAR(255) NOT NULL DEFAULT '1',
+    `ProductDescription` CHAR(255) NOT NULL DEFAULT '1',
+    `ProductUrl` CHAR(255) NOT NULL DEFAULT '1',
+    PRIMARY KEY (`Id`),
+    INDEX `ProductId` (`ProductId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+PARTITION BY KEY (Id) PARTITIONS 3;
+
+以上分区都是一个特点：所有的分区必须连续和连续大小进行分区。
+
+Mysql中如何落地List分区
+1、先创建Product-Partiton-List
+CREATE TABLE `product-Partiton-List` (
+    `Id` BIGINT(8) NOT NULL,
+    `ProductName` CHAR(245) NOT NULL DEFAULT '1',
+    `ProductId` BIGINT(32) NOT NULL DEFAULT '1',
+    `ProductDescription` CHAR(255) NOT NULL DEFAULT '1',
+    `ProductUrl` CHAR(255) NOT NULL DEFAULT '1',
+    `ProductStatus` int NOT NULL DEFAULT 0,
+    PRIMARY KEY (`Id`),
+    INDEX `ProductId` (`ProductId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+PARTITION BY LIST(Id) (
+    PARTITION a VALUES IN (1,5,6),
+    PARTITION b VALUES IN (2,7,8)
+);
+
+Mysql中如何落地组合分区
+CREATE TABLE `product-Partiton-flex` (
+    `Id` BIGINT(8) NOT NULL,
+    `ProductName` CHAR(245) NOT NULL DEFAULT '1',
+    `ProductId` CHAR(255) NOT NULL DEFAULT '1',
+    `ProductDescription` CHAR(255) NOT NULL DEFAULT '1',
+    `ProductUrl` CHAR(255) NOT NULL DEFAULT '1',
+    PRIMARY KEY (`Id`,`ProductName`),
+    INDEX `ProductId` (`ProductId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+PARTITION BY RANGE (Id) PARTITIONS 3
+SUBPARTITION BY KEY(ProductName)
+  SUBPARTITIONS 2 (
+    PARTITION p0 VALUES LESS THAN (12980),
+    PARTITION p1 VALUES LESS THAN (25960),
+    PARTITION p2 VALUES LESS THAN MAXVALUE
+);
+
+Mysql如何管理分区
+删除分区：
+ALERT TABLE users DROP PARTITION p0; 
+#删除分区 p0
+
+重建分区：
+RANGE 分区重建：
+ALTER TABLE users REORGANIZE PARTITION p0,p1 INTO (PARTITION p0 VALUES LESS THAN (6000000));  
+#将原来的 p0,p1 分区合并起来，放到新的 p0 分区中。
+LIST 分区重建：
+ALTER TABLE users REORGANIZE PARTITION p0,p1 INTO (PARTITION p0 VALUES IN(0,1,4,5,8,9,12,13));
+#将原来的 p0,p1 分区合并起来，放到新的 p0 分区中。
+HASH/KEY 分区重建：
+ALTER TABLE users REORGANIZE PARTITION COALESCE PARTITION 2; 
+#用 REORGANIZE 方式重建分区的数量变成2，在这里数量只能减少不能增加。想要增加可以用 ADD PARTITION 方法。
+
+新增分区：
+新增 RANGE 分区：
+#新增一个RANGE分区
+ALTER TABLE category ADD PARTITION (PARTITION p4 VALUES IN (16,17,18,19)
+            DATA DIRECTORY = '/data8/data'
+            INDEX DIRECTORY = '/data9/idx');
+新增 HASH/KEY 分区：
+ALTER TABLE users ADD PARTITION PARTITIONS 8;   #将分区总数加8个。
+给已有的表加上分区：
+alter table results partition by RANGE (month(ttime)) 
+(
+PARTITION p0 VALUES LESS THAN (1),
+PARTITION p1 VALUES LESS THAN (2) , 
+PARTITION p2 VALUES LESS THAN (3) ,
+PARTITION p3 VALUES LESS THAN (4) , 
+PARTITION p4 VALUES LESS THAN (5) ,
+PARTITION p5 VALUES LESS THAN (6) , 
+PARTITION p6 VALUES LESS THAN (7) ,
+PARTITION p7 VALUES LESS THAN (8) , 
+PARTITION p8 VALUES LESS THAN (9) ,
+PARTITION p9 VALUES LESS THAN (10) , 
+PARTITION p10 VALUES LESS THAN (11),
+PARTITION p11 VALUES LESS THAN (12),
+PARTITION P12 VALUES LESS THAN (13) 
+);
+
+2、分类 （row 行 ，column 列）
+1、水平分区
+这种形式分区是对表的行进行分区，通过这样的方式不同分组里面的物理列分割的数据集得以组合，从而进行个体分割（单分区）或集体分割（1个或多个分区）。所有在表中定义的列在每个数据集中都能找到，所以表的特性依然得以保持。
+举个简单例子：一个包含十年发票记录的表可以被分区为十个不同的分区，每个分区包含的是其中一年的记录。（朋奕注：这里具体使用的分区方式我们后面再说，可以先说一点，一定要通过某个属性列来分割，譬如这里使用的列就是年份）
+2、垂直分区
+这种分区方式一般来说是通过对表的垂直划分来减少目标表的宽度，使某些特定的列被划分到特定的分区，每个分区都包含了其中的列所对应的行。
+举个简单例子：一个包含了大text和BLOB的表，这些text和BLOB列又不经常被访问，这时候就要把这些不经常使用的text和BLOB了划分到另一个分区，在保证它们数据相关性的同时还能提高访问速度。
+
+3、读写分离
+一主二从，主读写，从读，主异步同步数据到从，非实时同步。
+
+4、分表
+水平分表，一个逻辑表对应多个实际表。按一定的表字段入到对应表名的分片策略（取模等）
+
+5、分库
+水平分库，一个逻辑库对应多个实际库。按一定的表字段入到对应数据库的分片策略（取模等）
+
+
+6、项目链接：https://github.com/guocanzhen/spring-boot-shading-sphere
+
+7、sharding-jdbc 分库分表的 4种分片策略
+标准分片策略
+复合分片策略
+行表达式分片策略
+Hint分片策略
+
+标准分片策略
+使用场景：SQL 语句中有>，>=, <=，<，=，IN 和 BETWEEN AND 操作符，都可以应用此分片策略。
+标准分片策略（StandardShardingStrategy），它只支持对单个分片健（字段）为依据的分库分表，并提供了两种分片算法 PreciseShardingAlgorithm（精准分片）和 RangeShardingAlgorithm（范围分片）。
+在使用标准分片策略时，精准分片算法是必须实现的算法，用于 SQL 含有 = 和 IN 的分片处理；范围分片算法是非必选的，用于处理含有 BETWEEN AND 的分片处理。
+一旦我们没配置范围分片算法，而 SQL 中又用到 BETWEEN AND 或者 like等，那么 SQL 将按全库、表路由的方式逐一执行，查询性能会很差需要特别注意。
+
+复合分片策略
+使用场景：SQL 语句中有>，>=, <=，<，=，IN 和 BETWEEN AND 等操作符，不同的是复合分片策略支持对多个分片健操作。
+
+行表达式分片策略
+行表达式分片策略（InlineShardingStrategy），在配置中使用 Groovy 表达式，提供对 SQL语句中的 = 和 IN 的分片操作支持，它只支持单分片健。
+行表达式分片策略适用于做简单的分片算法，无需自定义分片算法，省去了繁琐的代码开发，是几种分片策略中最为简单的。
+它的配置相当简洁，这种分片策略利用inline.algorithm-expression书写表达式。
+比如：ds-$->{order_id % 2} 表示对 order_id 做取模计算，$ 是个通配符用来承接取模结果，最终计算出分库ds-0 ··· ds-n，整体来说比较简单。
+
+Hint分片策略
+Hint分片策略（HintShardingStrategy）相比于上面几种分片策略稍有不同，这种分片策略无需配置分片健，分片健值也不再从SQL中解析，而是由外部指定分片信息，让 SQL在指定的分库、分表中执行。ShardingSphere 通过 Hint API实现指定操作，实际上就是把分片规则tablerule 、databaserule由集中配置变成了个性化配置。
+举个例子，如果我们希望订单表t_order用 user_id 做分片健进行分库分表，但是 t_order 表中却没有 user_id 这个字段，这时可以通过 Hint API 在外部手动指定分片健或分片库。
+
+分库：分库节点+分库策略
+分库分表：分库分表节点+分库策略+分表策略
+
+
+8、mycat
+
+
