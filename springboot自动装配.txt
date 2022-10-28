@@ -1,0 +1,107 @@
+springboot自动装配原理
+
+1、spring中bean注入的三种形式
+setter注入
+构造器注入
+属性注入
+
+2、Spring的两种配置方式
+基于XML的配置
+基于JavaConfig类的配置：想要成为JavaConfig类，需要使用@Configuration注解
+
+3、BeanDefinition
+
+4、BeanDefinition结构
+
+AbstractBeanDefinition
+
+1）beanClass
+这个属性决定了该Bean定义的真正class到底是谁，接下来我们来做点实验
+
+2）autowireMode自动装配模式
+自动装配模式默认是AUTOWIRE_NO，就是不开启自动装配
+可选的常量值有以下四种：不自动装配，通过名称装配，通过类型装配，通过构造器装配
+AUTOWIRE_NO
+AUTOWIRE_BY_NAME
+AUTOWIRE_BY_TYPE
+AUTOWIRE_CONSTRUCTOR
+
+3）constructorArgumentValues
+字面含义是构造器参数值，改变这个参数值，我们可以做到在实例化对象时指定特定的构造器
+
+5、装配对象
+自动装配的对象：Bean定义 （BeanDefinition）
+
+6、My自动装配
+
+1）@Import注解
+@Import的功能就是获取某个类的bean对象，他的使用形式大致如下：
+@Import(A.class)
+@Import(MyImportBeanDefinitionRegister.class)
+@Import(MyImportSelector.class)
+
+@Import(A.class)
+第一种形式@Import(A.class)，是最简单易懂的形式
+我们需要哪个Bean定义，直接Import他的class即可
+
+@Import(MyImportBeanDefinitionRegister.class)
+第二种形式@Import(MyImportBeanDefinitionRegister.class)
+传递了一个bean定义注册器，这个注册器的具体内容如下：
+public class MyImportBeanDefinitionRegister implements ImportBeanDefinitionRegistrar {
+    @Override
+    public void registerBeanDefinitions(AnnotationMetadata importingClassMetadata, BeanDefinitionRegistry registry) {
+        
+        RootBeanDefinition aDef = new RootBeanDefinition(A.class);
+        registry.registerBeanDefinition("a", aDef);
+        
+    }
+}
+
+@Import(MyImportSelector.class)
+第三种形式@Import(MyImportSelector.class)
+他传递了一个叫MyImportSelector的类，这个类依然是我们自己定义的，具体内容如下：
+public class MyImportSelector implements ImportSelector {
+    @Override
+    public String[] selectImports(AnnotationMetadata importingClassMetadata) {
+        // 导入配置类
+        return new String[]{"config.MyConfig"};
+    }
+}
+这个Importer返回的类如果是组件bean对象，就会被加载进来使用；如果是一个配置类，就会加载这个配置类
+
+第三种和第二种的区别是第三种可以一次性写很多类，而且比较简洁，只需要清楚类的全包名即可。而第二种方式需要自己清楚包类名，手动创建bean定义，然后手动加入BeanDefinitionMap。
+
+7、自动装配源码分析
+@SpringBootApplication这个注解由好多注解组成
+主要的有以下三个：
+@SpringBootConfiguration
+@EnableAutoConfiguration
+@ComponentScan
+
+1）@SpringBootConfiguration
+内含@Configuration，一个JavaConfig配置类，有了这个注解之后我们可以在SpringBoot运行的主类中使用@Bean标签配置类了
+
+2）@ComponentScan
+组件扫描
+这个扫描的范围是：SpringBoot主启动类的同级路径及子路径
+
+3）@EnableAutoConfiguration
+来看这个注解，也是最核心的内容
+看@EnableAutoConfiguration中的注解：@Import(AutoConfigurationImportSelector.class)，这里的作用便是导入了 AutoConfigurationImportSelector 这个类的bean定义
+AutoConfigurationImportSelector类实现了ImportSelector，重写了selectImports(AnnotationMetadata annotationMetadata)方法，这个方法返回的字符串数组内容就是我们返回的是要加载的Config配置文件的全包名，我们就能自动装配上这些配置文件下定义的bean对象，从而达到了自动装配的目的！
+
+4）loadFactoryNames方法
+这个方法非常简短，因为他调用了真正实现的方法：loadSpringFactories
+loadSpringFactories方法的返回值又调用了一个getOrDefault方法，这明显是一个容器类的方法，目的是从容器中拿点东西出来
+就此推测：loadSpringFactories返回了一个包含我们需要的Config全类名（字符串）的集合容器，然后从这个集合容器中拿出来的东西就是我们的configurations
+它确实返回了一个容器：Map<String, List<String>>
+这个容器的类型是：MultiValueMap<String, String>
+这个数据结构就非常牛逼了，多值集合映射（我自己的翻译）简单来说，一个key可以对应多个value，根据他的返回值，我们可以看到在这个方法中一个String对应了一个List<String>
+那么不难想到MultiValueMap中存放的形式：是”注解的类名——多个Config配置类“
+
+8、自动装配本质
+SpringBoot自动装配的本质就是通过Spring去读取META-INF/spring.factories中保存的配置类文件然后加载bean定义的过程。
+如果是标了@Configuration注解，就是批量加载了里面的bean定义
+如何实现”自动“：通过配置文件获取对应的批量配置类，然后通过配置类批量加载bean定义，只要有写好的配置文件spring.factories就实现了自动。
+
+9、总结

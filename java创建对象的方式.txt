@@ -1,0 +1,6 @@
+java创建对象的方式：
+
+1、new
+2、newInstance，运用反射创建对象时最常用的方法。Class类的newInstance使用的是类的public的无参构造器。获取 Class 对象的构造器对象，通过调用 Class 类的实例方法 getDeclaredConstractors() 来获取构造器对象的数组。
+3、使用 clone() 方法，必须先实现Cloneable接口并复写Object的clone方法
+4、使用反序列化的 readObject() 方法

@@ -1,0 +1,47 @@
+集合：
+
+iterator迭代器
+
+Collections.synchronizedSet或Collections.synchronizedList或Collections.synchronizedMap将集合包装成线程安全集合。
+
+List：Arraylist、LinkedList、Vector
+Arraylist：底层数据结构是数组，查询快，增删慢，线程不安全，效率高，可以存储重复元素
+动态数组，存储引用对象地址，指向堆对象
+初始容量是10，扩容会按之前的1.5倍进行扩容，通过数组复制
+通过数组索引，速度快
+需要预留一定存储空间
+
+LinkedList：底层数据结构是双向链表，增删快，线程不安全，可以存储重复元素
+LinkedList是线性的数据存储方式，所以需要移动指针从前往后依次查找。
+LinkedList主要控件开销在于需要存储节点信息以及节点指针。
+
+Vector：底层数据结构是动态数组
+初始容量10，可以手动设置扩容大小，设置为0时按之前的2倍进行扩容，
+Vector与ArrayList的实现方式非常相似，但是ArrayList中的方法没有synchronized关键字修饰，而Vector类中的方法都有synchronized关键字修饰，其中的单个方法都属于原子操作，是线程安全的。
+注意：多个原子操作组成的复合操作并不是线程安全的，必须将该复合操作变成原子操作，才能保证线程安全。
+然而正因为Vector类中每个方法中都添加了synchronized的关键字来保证同步，使得它的效率大大的降低了，比ArrayList的效率要慢，因此一般情况下都不使用Vector对象，而会选择使用ArrayList。
+
+Set：HashSet、LinkedHashSet、TreeSet
+HashSet：由HashMap实现的，不保证元素的顺序，而且HashSet允许使用 null 元素。
+
+Map：HashMap、HashTable、TreeMap、LinkedHashMap、IdentityHashMap、WeakHashMap
+HashMap：数组+(链表或红黑树)
+jdk1.7采用数组+链表，jdk1.8采用数组+(链表或红黑树)，如果链表长度大于8且节点数组长度大于等于64的时候，就把链表下所有的节点转为红黑树。否则继续采用扩容策略
+hashcode，该值用来定位要将这个元素存放到数组中的什么位置
+通过hashcode值和数组长度取模我们可以得到元素存储的下标。
+1、数组索引为1的地方是空的，这种情况很简单，直接将元素放进去就好了。
+2、已经有元素占据了索引为1的位置，这种情况下我们需要判断一下该位置的元素和当前元素是否相等，如果两者相等则直接覆盖，如果不等则在原元素下面使用链表的结构存储该元素。
+每个元素节点都有一个next属性指向下一个节点，这里由数组结构变成了数组+链表结构
+因为链表中元素太多的时候会影响查找效率，所以当链表的元素个数达到8的时候使用链表存储就转变成了使用红黑树存储，原因就是红黑树是平衡二叉树，在查找性能方面比链表要高。
+初始容量大小是创建时给数组分配的容量大小，默认值为16（哈希碰撞，均匀分布）。加载因子默认0.75f，用数组容量大小乘以加载因子得到一个值，一旦数组中存储的元素个数超过该值就会调用rehash方法将数组容量增加到原来的两倍，专业术语叫做扩容。
+在做扩容的时候会生成一个新的数组，原来的所有数据需要重新计算哈希码值重新分配到新的数组，所以扩容的操作非常消耗性能。
+非线程安全的
+
+线程安全的集合
+Vector相当于 ArrayList 的翻版，是长度可变的数组，Vector的每个方法都加了 synchronized 修饰符，是线程安全的。
+Hashtable是一个线程安全的集合,是单线程集合，它给几乎所有public方法都加上了synchronized关键字。这相当于给整个哈希表加了一把大锁。
+Stack继承于Vector， 栈是后进先出的。
+ArrayBlockingQueue是一个阻塞队列,底层使用数组结构实现,按照先进先出(FIFO)的原则对元素进行排序。
+ConcurrentHashMap jdk1.7采用了分段锁(Segment，针对数据操作加锁)，jdk1.8采用node，针对数组加锁，HashTable的加锁方法是给每个方法加上synchronized关键字，线程安全。
+ConcurrentLinkedQueue是一种FIFO的无界队列，是线程安全的，它适用于“高并发”的场景。
+

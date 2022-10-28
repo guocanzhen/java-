@@ -1,0 +1,68 @@
+事务：
+
+@Transactional原理：AOP动态代理
+
+
+
+
+@Transactional事务嵌套：
+1、两个方法在同一个类中：同一个类中子方法上的@Transactional注解是不生效的，都是取决于主方法有没有事务。
+@Transactional事务是Spring采用动态代理(AOP)来实现的，为我们的每个类生成一个代理对象。只有在代理对象之间进行调用时，可以触发AOP。
+而在同一个类中，主方法调用子方法，调用的是原对象的方法，而不通过代理对象。所以Spring无法切到这次调用，也就无法通过注解保证事务性了。也就是说，在同一个类中的方法调用，则不会被方法拦截器拦截到，因此事务不会起作用。
+2、当两个方法不再同一个类中，把子方法注入（@Autowried）到主方法中：
+主有子有：有
+注：
+子为propagation = Propagation.REQUIRES_NEW（新的事务），如果子回滚，主回滚。如果主回滚，子不回滚。
+主有子无：有
+主无子有：子有
+
+事务失效：
+1、@Transactional 注解只能应用到 public 可见度的方法上。
+如果应用在protected、private或者 package可见度的方法上，也不会报错，不过事务设置不会起作用。
+2、默认情况下，Spring会对Error或者RuntimeException异常进行事务回滚，
+其他继承自java.lang.Exception的异常：如IOException、TimeoutException等，不会回滚。
+解决方案：Transactional注解加 rollbackFor 属性，指定java.lang.Exception.class;
+3、try-catch异常，事务不会生效
+spring的事务是在调用业务方法之前开始的，业务方法执行完毕之后才执行commit or rollback，
+事务是否执行取决于是否抛出runtime异常。如果抛出runtime exception 并在你的业务方法中没有catch到的话，事务会回滚。
+4、@Transactional 注解属性 propagation 设置错误
+TransactionDefinition.PROPAGATION_NOT_SUPPORTED：以非事务方式运行，如果当前存在事务，则把当前事务挂起。
+TransactionDefinition.PROPAGATION_NEVER：以非事务方式运行，如果当前存在事务，则抛出异常。
+5、同一个类中方法调用，导致@Transactional失效
+场景：开发中避免不了会对同一个类里面的方法调用，比如有一个类Test，它的一个方法A，A再调用本类的方法B
+（不论方法B是用public还是private修饰），但方法A没有声明注解事务，而B方法有。则外部调用方法A之后，
+方法B的事务是不会起作用的。
+原因：由于使用Spring AOP代理造成的，因为只有当事务方法被当前类以外的代码调用时，才会由Spring生成的代理对象来管理。
+6、数据库引擎不支持事务。
+7、@Scheduled和@Thransaction不能在同一个类中。并且实体类要加上@EnableTransactionManagement注解，使我们这个工程支持事务。
+
+事务隔离级别isolation：
+@Transactional(isolation = Isolation.READ_UNCOMMITTED)：读取未提交数据(会出现脏读, 不可重复读) 基本不使用
+@Transactional(isolation = Isolation.READ_COMMITTED)：读取已提交数据(会出现不可重复读和幻读)
+@Transactional(isolation = Isolation.REPEATABLE_READ)：可重复读(会出现幻读)
+@Transactional(isolation = Isolation.SERIALIZABLE)：串行化
+
+事物传播行为propagation:
+@Transactional(propagation=Propagation.REQUIRED) ：如果有事务, 那么加入事务, 没有的话新建一个(默认情况下)
+@Transactional(propagation=Propagation.NOT_SUPPORTED) ：容器不为这个方法开启事务
+@Transactional(propagation=Propagation.REQUIRES_NEW) ：不管是否存在事务,都创建一个新的事务,原来的挂起,新的执行完毕,继续执行老的事务
+@Transactional(propagation=Propagation.MANDATORY) ：必须在一个已有的事务中执行,否则抛出异常
+@Transactional(propagation=Propagation.NEVER) ：必须在一个没有的事务中执行,否则抛出异常(与Propagation.MANDATORY相反)
+@Transactional(propagation=Propagation.SUPPORTS) ：如果其他bean调用这个方法,在其他bean中声明事务,那就用事务.如果其他bean没有声明事务,那就不用事务.
+
+timeout:该属性用于设置事务的超时秒数，默认值为-1表示永不超时
+readOnly：该属性用于设置当前事务是否为只读事务，设置为true表示只读，false则表示可读写，默认值为false。例如：@Transactional(readOnly=true)
+
+rollbackFor：该属性用于设置需要进行回滚的异常类数组，当方法中抛出指定异常数组中的异常时，则进行事务回滚。例如：
+指定单一异常类：@Transactional(rollbackFor=RuntimeException.class)
+指定多个异常类：@Transactional(rollbackFor={RuntimeException.class, Exception.class})
+
+rollbackForClassName：该属性用于设置需要进行回滚的异常类名称数组，当方法中抛出指定异常名称数组中的异常时，则进行事务回滚。例如：
+指定单一异常类名称：@Transactional(rollbackForClassName="RuntimeException")
+指定多个异常类名称：@Transactional(rollbackForClassName={"RuntimeException","Exception"})
+
+noRollbackFor/noRollbackForClassName:该属性用于设置不需要进行回滚的异常类数组，当方法中抛出指定异常数组中的异常时，不进行事务回滚。例如：
+指定单一异常类：@Transactional(noRollbackFor=RuntimeException.class)
+指定多个异常类：@Transactional(noRollbackFor={RuntimeException.class, Exception.class})
+
+

@@ -1,0 +1,93 @@
+SpringBoot启动流程（v2.7.0）：
+
+
+执行main方法
+
+1、第一步new了一个SpringApplication对象，接下来我们一起看下new SpringApplication() 主要做了什么事情。
+1）先把入参类保存起来
+this.primarySources = new LinkedHashSet(Arrays.asList(primarySources));
+2）判断运行项目的类型
+this.webApplicationType = WebApplicationType.deduceFromClasspath();
+3）扫描当前路径下META-INF/spring.factories文件的内容，获取BootstrapRegistryInitializer配置
+this.bootstrapRegistryInitializers = new ArrayList(this.getSpringFactoriesInstances(BootstrapRegistryInitializer.class));
+4）扫描当前路径下META-INF/spring.factories文件的内容，通过反射创建ApplicationContextInitializer接口实例
+this.setInitializers(this.getSpringFactoriesInstances(ApplicationContextInitializer.class));
+5）扫描当前路径下META-INF/spring.factories文件的内容，通过反射创建ApplicationListener接口实例
+this.setListeners(this.getSpringFactoriesInstances(ApplicationListener.class));
+6）保存堆栈中的main方法所在的类
+this.mainApplicationClass = this.deduceMainApplicationClass();
+
+
+第二部调用了run()方法
+2、执行run() 方法
+1）设置开始时间
+long startTime = System.nanoTime();
+2）使用bootstrapRegistryInitializers完成bootstrap上下文初始化
+DefaultBootstrapContext bootstrapContext = this.createBootstrapContext();
+3）设置系统属性：java.awt.headless，取值true or false
+（java.awt.headless是J2SE的一种模式，用于在缺失显示屏、鼠标或者键盘时的系统配置。对于后端服务来讲，很多都是需要将这个属性设置为true的。对于开发者来讲常常需要在该模式下工作。因为服务器（如提供Web服务的）往往可能缺少前述设备，但又需要使用他们提供的功能，生成相应的数据，以提供给客户端（如浏览器所在的配有相关的、键盘和的主机）。）
+this.configureHeadlessProperty();
+4）扫描当前路径下META-INF/spring.factories文件的内容，通过反射创建SpringApplicationRunListener接口实例集合，再new SpringApplicationRunListeners对象
+SpringApplicationRunListeners listeners = this.getRunListeners(args);
+5）执行starting方法
+listeners.starting(bootstrapContext, this.mainApplicationClass);
+6）初始化默认应用参数实例，内含命令行参数（功能操作参数option）
+ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
+7）准备运行环境（创建应用环境、配置环境），并且把环境跟spring上下文绑定好，并且执行environmentPrepared()方法
+ConfigurableEnvironment environment = this.prepareEnvironment(listeners, bootstrapContext, applicationArguments);
+8）配置spring.beaninfo.ignore属性，默认true
+this.configureIgnoreBeanInfo(environment);
+9）印刷横幅
+Banner printedBanner = this.printBanner(environment);
+10）创建应用上下文
+context = this.createApplicationContext();
+11）设置应用上下文启动属性
+context.setApplicationStartup(this.applicationStartup);
+12）准备应用上下文
+this.prepareContext(bootstrapContext, context, environment, listeners, applicationArguments, printedBanner);
+13）更新应用上下文
+this.refreshContext(context);
+1、注册应用程序上下文 - 添加运行时关闭挂钩、添加应用程序上下文关闭侦听器；
+2、上下文刷新
+准备刷新
+准备bean工厂
+后处理 Bean 工厂
+调用 Bean Factory 后处理器 - 扫描spring组件、处理成员类、处理进口注解、处理接口
+注册 Bean 后处理器
+bean后处理结束
+初始化消息源
+初始化应用事件多播
+刷新 - 初始化主题源、创建网络服务器tomcat（定制connector时设置maxThreads=200，minSpareThreads=10，maxHttpHeaderSize=8192，maxSwallowSize=2097152，maxHttpFormPostSize=2097152，maxConnections=8192，acceptCount=100，processorCache=200，maxKeepAliveRequests=100，rejectIllegalHeader=true，AutoDeploy=false，配置引擎、容器，autoStart=true）
+注册监听器
+完成 Bean 工厂初始化
+完成刷新
+14）更新之后
+this.afterRefresh(context, applicationArguments);
+15）应用启动耗时
+Duration timeTakenToStartup = Duration.ofNanos(System.nanoTime() - startTime);
+16）监听器已启动
+listeners.started(context, timeTakenToStartup);
+17）调用容器里所有实现了applicationrunner、commandlinerunner接口的方法
+this.callRunners(context, applicationArguments);
+18）准备耗时
+Duration timeTakenToReady = Duration.ofNanos(System.nanoTime() - startTime);
+19）发布应用上下文就绪事件：ApplicationReadyEvent，标志着可以处理接收的请求了
+listeners.ready(context, timeTakenToReady);
+20）返回应用上下文
+return context;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
