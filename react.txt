@@ -1,0 +1,20 @@
+一、入门
+
+1、react三个核心库：
+<!-- react底层核心库 -->
+<script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+<!-- React操作DOM的核心库，类似jQuery -->
+<script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+<!-- 用于解析babel -->
+<script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+
+2、注意
+<script type="text/babel">
+	// ES6方法创建，必须使用type=text/babel
+	// Babel会把jsx转义为一个名为React.createElement()函数调用
+	
+</script>
+
+
+3、

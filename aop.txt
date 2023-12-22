@@ -1,14 +1,23 @@
-aop：
+Spring AOP 原理：
 
-aop实现原理分析：
+1、面向切片编程（AOP—Aspect Oriented Programming）可以说是对OOP（面向对象编程）的补充和完善。
+
+举个例子：
+面向对象就是将事物的特性和行为抽象为一个对象，如people类有身高、体重、年龄等属性，也有吃饭、睡觉等行为。把这些特性和行为封装成一个类，然后可以统一调用。
+面向切片也可以举个例子，比如people类有自己的属性和行为，但是有小一部分人生病要去医院看病，看病这个业务逻辑就不属于哪一个类，因为people泛指所有人，所有人不会都看病。AOP就是把医院看病这一个业务逻辑功能抽取出来，然后动态把这个功能切入到需要的方法（或行为）中，需要的才切入，这样便于减少系统的重复代码，降低模块间的耦合度。
+常用到AOP的就是安全校验、日志操作、事务操作等，给你先定义好，然后在想用的地方用，这样不会影响已经在服务器运行的项目，然后又能注入新功能，灵活。我们开发dao->service->controller是纵向的，这个AOP就是横向切入，如横向切入一个日志Log，打印执行过程。
+
+Spring AOP就是基于动态代理实现的， 分为两种代理，jdk动态代理（基于接口）和cglib代理（基于类的）。
+如果目标对象实现了接口，就用jdk动态代理，如果未实现接口就用cglib动态代理。虽然动态代理可以解决耦合问题，但比较抽象，复杂，属于底层实现代理模式，我们这里直接用AOP，AOP做了很多封装，只要调用API即可，简化开发，但是AOP底层原理还是需要了解。
+
+
+2、aop实现分析：
 Spring 中的 AOP，有接口就用 JDK 动态代理，没有接口就用 Cglib 动态代理。
 Spring Boot 中的 AOP，2.0 之前和 Spring 一样；2.0 之后首选 Cglib 动态代理，如果用户想要使用 JDK 动态代理，需要自己手动配置。
 spring.aop.proxy-target-class：false为jdk动态代理，true为cglib动态代理，默认true
 
-
-1、jdkaop实现原理简介
-
-1）AOP的advisor和advice配置：
+实现AOP的四种方式
+1、AOP的advisor和advice配置：
 @Component
 @Aspect
 public class AopConfig {
@@ -24,7 +33,7 @@ public class AopConfig {
     }
 }
 
-2）AopObject，被代理拦截对象：
+2、AopObject，被代理拦截对象：
 @Component
 public class AopObject {
 
@@ -32,10 +41,6 @@ public class AopObject {
         System.out.println("logic");
     }
 }
-
-2、代理实现的处理器(BeanPostProcessor)
-首先是第一步内容，对我们在AopConfig中的AOP配置内容进行解析并且保存到BeanFactory中，这个过程就是解析保存切面信息。
-1）代理实现的源头–AnnotationAwareAspectJAutoProxyCreator
 
 
 

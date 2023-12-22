@@ -1,7 +1,9 @@
 mysql性能优化：
 
-mysql explain -- type：all，index，range，ref，eq_ref，const，system，null
-分库分表
+1）mysql explain -- type：all，index，range，ref，eq_ref，const，system，null
+https://www.cnblogs.com/canzhen/p/16092883.html
+
+分库分表 -- sharding sphere
 读写分离 -- master，slave主从，master写入，slave查询
 慢SQL
 

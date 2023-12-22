@@ -1,6 +1,7 @@
 线程：
 
-线程与进程的关系
+1）线程与进程的关系
+
 1、线程：每个进程中至少包含一个线程，而这些线程都在共享进程的资源空间等，当线程发生变化的时候只会引起CPU执行的过程发生变化，不会改变进程所拥有的资源。同理一个程序中至少包含一个进程。进程中执行运算的最小单位，亦是执行处理机调度的基本单位
 2、进程：每个进程都有自己的地址空间，资源如，内存，I/O,CPU，同一个进程里的线程共享本进程里的地址空间，那能不能使用别人家进程的地址空间呢，显然这是不可以的。由于进程的独立性，当某一个进程崩溃之后，在保护模式下不会对别的进程进行影响。资源分配的基本单位，运行调度的基本单位，系统中并发执行的单位。
 3、使用区别：当我们对资源的保护管理要求比较高的时候，建议使用多进程，当然存在的开销也会比较大，反过来，如果频繁切换下，对资源的保护管理要求不那么高，或者开销有限，使用多线程会比较方便。
@@ -14,7 +15,8 @@
 一般来说，线程并不会拥有自己的资源，但是它可以访问自己本进程中的资源，比如，一个进程打开的文件等，进程的其他线程是可以共享的。
 （4）系统开销
 
-多线程
+
+2）多线程
 创建：
 1、继承Thread类：重写run方法，运行：Thread.start
 2、实现Runnable接口：重写run方法，运行：Thread.start
@@ -24,3 +26,315 @@ callable的核心是call方法，允许返回值，runnable的核心是run方法
 call方法可以抛出异常，但是run方法不行
 因为runnable是java1.1就有了，所以他不存在返回值，后期在java1.5进行了优化，就出现了callable，就有了返回值和抛异常
 callable和runnable都可以应用于executors。而thread类只支持runnable
+
+
+3）线程池：
+
+线程池，参数及其作用
+1、核心线程数：线程池中会维护一个最小的线程数量，即使这些线程处理空闲状态，他们也不会被销毁，除非设置了allowCoreThreadTimeOut。这里的最小线程数量即是corePoolSize。任务提交到线程池后，首先会检查当前线程数是否达到了corePoolSize，如果没有达到的话，则会创建一个新线程来处理这个任务。
+2、最大线程数：当前线程数达到corePoolSize后，如果继续有任务被提交到线程池，会将任务缓存到工作队列（后面会介绍）中。如果队列也已满，则会去创建一个新线程来出来这个处理。线程池不会无限制的去创建新线程，它会有一个最大线程数量的限制，这个数量即由maximunPoolSize指定。
+3、工作队列、队列大小：新任务被提交后，会先进入到此工作队列中，任务调度时再从队列中取出任务。
+①ArrayBlockingQueue：基于数组的有界阻塞队列，按FIFO排序。新任务进来后，会放到该队列的队尾，有界的数组可以防止资源耗尽问题。当线程池中线程数量达到corePoolSize后，再有新任务进来，则会将任务放入该队列的队尾，等待被调度。如果队列已经是满的，则创建一个新线程，如果线程数量已经达到maxPoolSize，则会执行拒绝策略。
+②LinkedBlockingQuene：基于链表的无界阻塞队列（其实最大容量为Interger.MAX），按照FIFO排序。由于该队列的近似无界性，当线程池中线程数量达到corePoolSize后，再有新任务进来，会一直存入该队列，而基本不会去创建新线程直到maxPoolSize（很难达到Interger.MAX这个数），因此使用该工作队列时，参数maxPoolSize其实是不起作用的。
+③SynchronousQuene：一个不缓存任务的阻塞队列，生产者放入一个任务必须等到消费者取出这个任务。也就是说新任务进来时，不会缓存，而是直接被调度执行该任务，如果没有可用线程，则创建新线程，如果线程数量达到maxPoolSize，则执行拒绝策略。
+④PriorityBlockingQueue：具有优先级的无界阻塞队列，优先级通过参数Comparator实现。
+4、空闲线程活跃时间：一个线程如果处于空闲状态，并且当前的线程数量大于corePoolSize，那么在指定时间后，这个空闲线程会被销毁，这里的指定时间由keepAliveTime来设定
+5、空闲线程活跃时间单位
+6、默认线程名称、线程工厂
+7、拒绝策略
+丢弃策略DiscardPolicy：对新的任务不做任何处理，翻译过来就是丢弃策略，业务中慎用。
+中止策略AbortPolicy：抛出了RejectedExecutionException异常，会对代码的运行进行中止，默认拒绝策略，不执行新任务抛出异常
+优先处理策略CallerRunsPolicy：把新任务交给主线程来执行，对新的任务进行优先执行，直接调用其run方法
+丢弃最老任务DiscardOldestPolicy：拿到队列，调用队列的poll方法对队列中最老的任务进行丢弃，再将新的任务放入队列中
+自定义拒绝策略：重写rejectedExecution方法，可以写到日志里面，也可以存储到数据库 ，也可以啥也不做
+
+
+4）案例使用：
+
+1、如何判断线程池已经执行完所有任务了？
+
+4种判断线程池任务是否执行完的方法：
+使用 isTerminated 方法判断。
+使用 getCompletedTaskCount 方法判断。
+使用 CountDownLatch 判断。
+使用 CyclicBarrier 判断。
+
+不判断的问题
+如果不对线程池是否已经执行完做判断，就会出现以下问题，如下代码所示：
+import java.util.Random;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+ 
+public class ThreadPoolCompleted {
+    public static void main(String[] args) {
+        // 创建线程池
+        ThreadPoolExecutor threadPool = new ThreadPoolExecutor(10, 20,
+                0, TimeUnit.SECONDS, new LinkedBlockingDeque<>(1024));
+        // 添加任务
+        addTask(threadPool);
+                // 打印结果
+        System.out.println("线程池任务执行完成！");
+    }
+   
+    /**
+     * 给线程池添加任务
+     */
+    private static void addTask(ThreadPoolExecutor threadPool) {
+        // 任务总数
+        final int taskCount = 5;
+        // 添加任务
+        for (int i = 0; i < taskCount; i++) {
+            final int finalI = i;
+            threadPool.submit(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        // 随机休眠 0-4s
+                        int sleepTime = new Random().nextInt(5);
+                        TimeUnit.SECONDS.sleep(sleepTime);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    System.out.println(String.format("任务%d执行完成", finalI));
+                }
+            });
+        }
+    }
+}
+
+程序先打印了“线程池任务执行完成！”，然后还在陆续的执行线程池的任务，产生以上问题的原因是因为主线程 main，和线程池是并发执行的，所以当线程池还没执行完，main 线程的打印结果代码就已经执行了。想要解决这个问题，就需要在打印结果之前，先判断线程池的任务是否已经全部执行完，如果没有执行完就等待任务执行完再执行打印结果。
+
+
+方法1：isTerminated
+我们可以利用线程池的终止状态（TERMINATED）来判断线程池的任务是否已经全部执行完，但想要线程池的状态发生改变，我们就需要调用线程池的 shutdown 方法，不然线程池一直会处于 RUNNING 运行状态，那就没办法使用终止状态来判断任务是否已经全部执行完了，它的实现代码如下：
+import java.util.Random;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * 线程池任务执行完成判断
+ */
+public class ThreadPoolCompleted {
+    public static void main(String[] args) {
+        // 1.创建线程池
+        ThreadPoolExecutor threadPool = new ThreadPoolExecutor(10, 20,
+                0, TimeUnit.SECONDS, new LinkedBlockingDeque<>(1024));
+        // 2.添加任务
+        addTask(threadPool);
+        // 3.判断线程池是否执行完
+        isCompleted(threadPool); // 【核心调用方法】
+        // 4.线程池执行完
+        System.out.println();
+        System.out.println("线程池任务执行完成！");
+    }
+ 
+    /**
+     * 方法1：isTerminated 实现方式
+     * 判断线程池的所有任务是否执行完
+     */
+    private static void isCompleted(ThreadPoolExecutor threadPool) {
+        threadPool.shutdown();
+        while (!threadPool.isTerminated()) { // 如果没有执行完就一直循环
+        }
+    }
+ 
+    /**
+     * 给线程池添加任务
+     */
+    private static void addTask(ThreadPoolExecutor threadPool) {
+        // 任务总数
+        final int taskCount = 5;
+        // 添加任务
+        for (int i = 0; i < taskCount; i++) {
+            final int finalI = i;
+            threadPool.submit(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        // 随机休眠 0-4s
+                        int sleepTime = new Random().nextInt(5);
+                        TimeUnit.SECONDS.sleep(sleepTime);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    System.out.println(String.format("任务%d执行完成", finalI));
+                }
+            });
+        }
+    }
+}
+
+方法说明：shutdown 方法是启动线程池有序关闭的方法，它在完全关闭之前会执行完之前所有已经提交的任务，并且不会再接受任何新任务。当线程池中的所有任务都执行完之后，线程池就进入了终止状态，调用 isTerminated 方法返回的结果就是 true 了。
+
+缺点分析：需要关闭线程池。
+扩展：线程池的所有状态
+
+线程池总共包含以下 5 种状态：
+RUNNING：运行状态。接受新任务并处理排队的任务
+SHUTDOWN：关闭状态。不接受新任务，但处理排队的任务
+STOP：阻断状态。不接受新任务，不处理排队任务，并中断正在进行的任务
+TIDYING：整理状态。所有任务都已终止，workerCount为零，转换到状态TIDYING的线程将运行terminated（）钩子方法
+TERMINATED：终止状态。terminated（）已完成
+
+如果不调用线程池的关闭方法SHUTDOWN，那么线程池会一直处于 RUNNING 运行状态。
+
+方法2：getCompletedTaskCount
+我们可以通过判断线程池中的计划执行任务数和已完成任务数，来判断线程池是否已经全部执行完，如果计划执行任务数=已完成任务数，那么线程池的任务就全部执行完了，否则就未执行完，具体实现代码如下：
+
+public static void main(String[] args) {
+	// 1.创建线程池
+	ThreadPoolExecutor threadPool = new ThreadPoolExecutor(10, 20, 0, TimeUnit.SECONDS, new LinkedBlockingDeque<>(1024));
+	// 2.添加任务
+	addTask(threadPool);
+	// 3.判断线程池是否执行完
+	isCompletedByTaskCount(threadPool);
+	// 【核心调用方法】
+	// 4.线程池执行完
+	System.out.println();
+	System.out.println("线程池任务执行完成！");
+}
+private static void isCompletedByTaskCount(ThreadPoolExecutor threadPool) {
+	while (threadPool.getTaskCount() != threadPool.getCompletedTaskCount()) {
+	}
+}   
+/**
+* 给线程池添加任务
+*/
+private static void addTask(ThreadPoolExecutor threadPool) {
+	// 任务总数
+	final int taskCount = 5;
+	// 添加任务
+	for (int i = 0; i < taskCount; i++) {
+		final int finalI = i;
+		threadPool.submit(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					// 随机休眠 0-4s
+					int sleepTime = new Random().nextInt(5);
+					TimeUnit.SECONDS.sleep(sleepTime);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				System.out.println(String.format("任务%d执行完成", finalI));
+			}
+		});
+	}
+}
+
+方法说明
+getTaskCount()：返回计划执行的任务总数。由于任务和线程的状态可能在计算过程中动态变化，因此返回的值只是一个近似值。
+getCompletedTaskCount()：返回完成执行任务的总数。因为任务和线程的状态可能在计算过程中动态地改变，所以返回的值只是一个近似值，但是在连续的调用中并不会减少。
+
+优缺点分析
+此实现方法的优点是无需关闭线程池。 它的缺点是 getTaskCount() 和 getCompletedTaskCount() 返回的是一个近似值，因为线程池中的任务和线程的状态可能在计算过程中动态变化，所以它们两个返回的都是一个近似值。
+
+方法3：CountDownLatch
+
+CountDownLatch 可以理解为一个计数器，我们创建了一个包含 N 个任务的计数器，每个任务执行完计数器 -1，直到计数器减为 0 时，说明所有的任务都执行完了，就可以执行下一段业务的代码了，它的实现流程具体实现代码如下：
+
+public static void main(String[] args) throws InterruptedException {
+    // 创建线程池
+    ThreadPoolExecutor threadPool = new ThreadPoolExecutor(10, 20,
+        0, TimeUnit.SECONDS, new LinkedBlockingDeque<>(1024));
+	// 任务总数
+    final int taskCount = 5;    
+    // 单次计数器，声明一个包含了 5 个任务的计数器；
+    CountDownLatch countDownLatch = new CountDownLatch(taskCount); 
+    // 添加任务
+    for (int i = 0; i < taskCount; i++) {
+        final int finalI = i;
+        threadPool.submit(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    // 随机休眠 0-4s
+                    int sleepTime = new Random().nextInt(5);
+                    TimeUnit.SECONDS.sleep(sleepTime);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                System.out.println(String.format("任务%d执行完成", finalI));
+                // 线程执行完，计数器 -1
+                countDownLatch.countDown(); 
+            }
+        });
+    }
+    // 阻塞等待线程池任务执行完
+    countDownLatch.await();  
+    // 线程池执行完
+    System.out.println();
+    System.out.println("线程池任务执行完成！");
+}
+
+优缺点分析
+CountDownLatch 写法很优雅，且无需关闭线程池，但它的缺点是只能使用一次，CountDownLatch 创建之后不能被重复使用，也就是说 CountDownLatch 可以理解为只能使用一次的计数器。
+
+方法4：CyclicBarrier
+CyclicBarrier 和 CountDownLatch 类似，它可以理解为一个可以重复使用的循环计数器，CyclicBarrier 可以调用 reset 方法将自己重置到初始状态，CyclicBarrier 具体实现代码如下：
+
+public static void main(String[] args) throws InterruptedException {
+    // 创建线程池
+    ThreadPoolExecutor threadPool = new ThreadPoolExecutor(10, 20,
+        0, TimeUnit.SECONDS, new LinkedBlockingDeque<>(1024));
+	// 任务总数
+    final int taskCount = 5;    
+    // 循环计数器
+    CyclicBarrier cyclicBarrier = new CyclicBarrier(taskCount, new Runnable() {
+        @Override
+        public void run() {
+            // 线程池执行完
+            System.out.println();
+            System.out.println("线程池所有任务已执行完！");
+        }
+    });
+    // 添加任务
+    for (int i = 0; i < taskCount; i++) {
+        final int finalI = i;
+        threadPool.submit(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    // 随机休眠 0-4s
+                    int sleepTime = new Random().nextInt(5);
+                    TimeUnit.SECONDS.sleep(sleepTime);
+                    System.out.println(String.format("任务%d执行完成", finalI));
+                    // 线程执行完
+                    cyclicBarrier.await(); 
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } catch (BrokenBarrierException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+}
+
+方法说明
+CyclicBarrier 有 3 个重要的方法：
+
+构造方法：构造方法可以传递两个参数，参数 1 是计数器的数量 parties，参数 2 是计数器为 0 时，也就是任务都执行完之后可以执行的事件（方法）。
+
+await 方法：在 CyclicBarrier 上进行阻塞等待，当调用此方法时 CyclicBarrier 的内部计数器会 -1，直到发生以下情形之一：
+在 CyclicBarrier 上等待的线程数量达到 parties，也就是计数器的声明数量时，则所有线程被释放，继续执行。
+当前线程被中断，则抛出 InterruptedException 异常，并停止等待，继续执行。
+其他等待的线程被中断，则当前线程抛出 BrokenBarrierException 异常，并停止等待，继续执行。
+其他等待的线程超时，则当前线程抛出 BrokenBarrierException 异常，并停止等待，继续执行。
+其他线程调用 CyclicBarrier.reset() 方法，则当前线程抛出 BrokenBarrierException 异常，并停止等待，继续执行。
+
+reset 方法：使得CyclicBarrier回归初始状态，直观来看它做了两件事：
+如果有正在等待的线程，则会抛出 BrokenBarrierException 异常，且这些线程停止等待，继续执行。
+将是否破损标志位 broken 置为 false。
+
+优缺点分析
+CyclicBarrier 从设计的复杂度到使用的复杂度都高于 CountDownLatch，相比于 CountDownLatch 来说它的优点是可以重复使用（只需调用 reset 就能恢复到初始状态），缺点是使用难度较高。
+
+总结：
+ 4 种判断线程池任务是否执行完的方法：
+使用 isTerminated 方法判断：通过判断线程池的完成状态来实现，需要关闭线程池，一般情况下不建议使用。
+使用 getCompletedTaskCount 方法判断：通过计划执行总任务量和已经完成总任务量，来判断线程池的任务是否已经全部执行，如果相等则判定为全部执行完成。但因为线程个体和状态都会发生改变，所以得到的是一个大致的值，可能不准确。
+使用 CountDownLatch 判断：相当于一个线程安全的单次计数器，使用比较简单，且不需要关闭线程池，是比较常用的判断方法。
+使用 CyclicBarrier 判断：相当于一个线程安全的重复计数器，但使用较为复杂，所以日常项目中使用的较少。
